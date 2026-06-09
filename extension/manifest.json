@@ -1,0 +1,13 @@
+{
+    "manifest_version": 3,
+    "name": "Toxic Text Predictor",
+    "version": "1.0",
+    "description": "Send batches of text to local FastAPI server.",
+    "permissions": [
+        "activeTab",
+        "scripting"
+    ],
+    "action": {
+        "default_popup": "popup.html"
+    }
+}
