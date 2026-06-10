@@ -1,55 +1,37 @@
+async function getRedactionState() {
+    const data = await chrome.storage.local.get("enableRedaction");
+    return data.enableRedaction || false;
+}
+
+function updateButtonUI(isEnabled) {
+    const btn = document.getElementById('scanBtn');
+    if (isEnabled) {
+        btn.style.backgroundColor = ""; // Reset to your CSS default (e.g., Green/Blue)
+        btn.innerText = "Disable Redaction";
+    } else {
+        btn.style.backgroundColor = "#cccccc"; // Grey when disabled
+        btn.innerText = "Enable Redaction";
+    }
+}
+
 document.getElementById('scanBtn').addEventListener('click', async () => {
-    const resultDiv = document.getElementById('result');
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const currentState = await getRedactionState();
+    const newState = !currentState;
 
-    resultDiv.innerText = "Analyzing...";
+    await chrome.storage.local.set({ enableRedaction: newState });
+    chrome.runtime.sendMessage({ action: "toggleState", enabled: newState });
 
+    updateButtonUI(newState);
+});
 
-    chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => document.body.innerText
-    }, async (results) => {
-        const sentences = new Intl.Segmenter('en', { granularity: 'sentence' })
-            .segment(results[0].result);
-        const sentenceArray = Array.from(sentences).map(s => s.segment.trim()).filter(s => s.length > 10);
+document.addEventListener('DOMContentLoaded', async () => {
+    const isEnabled = await getRedactionState();
+    updateButtonUI(isEnabled);
+    // Only update UI on popup open — don't trigger a scan
+});
 
-        try {
-            const response = await fetch('http://127.0.0.1:8000/predict', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ words: sentenceArray })
-            });
-
-
-            const resultsData = await response.json();
-            const processedData = resultsData.data;
-
-            const toxicCount = resultsData.data.filter(item => item.label == 2).length;
-            resultDiv.innerText = `Total Sentences: ${sentenceArray.length}\n` +
-                `Toxic/Offensive Detected: ${toxicCount}`;
-
-            // Send this mapping to the page to perform replacements
-
-            chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: (data) => {
-                    // Iterate through all text nodes on the page
-                    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-                    let node;
-                    while (node = walker.nextNode()) {
-                        data.forEach(item => {
-                            if (item.label == 2 && node.textContent.includes(item.text)) {
-                                node.textContent = node.textContent.replace(item.text, "[#####]");
-                            }
-                        });
-                    }
-                },
-                args: [processedData]
-
-            });
-
-        } catch (e) {
-            resultDiv.innerText = "Error: Is the server running?";
-        }
-    });
+chrome.runtime.onMessage.addListener(async (message, sender) => {
+    if (message.action === "updatePopupUI") {
+        document.getElementById("result").innerText = "Toxic Comment Count: " + message.toxicCount
+    }
 });

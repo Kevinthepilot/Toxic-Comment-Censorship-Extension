@@ -1,13 +1,33 @@
 {
     "manifest_version": 3,
-    "name": "Toxic Text Predictor",
+    "name": "AI Toxic Comment Redactor",
     "version": "1.0",
-    "description": "Send batches of text to local FastAPI server.",
+    "description": "Automatically scans pages for toxic or offensive comments and redacts it using local AI analysis.",
     "permissions": [
-        "activeTab",
-        "scripting"
+        "storage",
+        "scripting",
+        "tabs"
+    ],
+    "host_permissions": [
+        "http://127.0.0.1:8000/*",
+        "<all_urls>"
     ],
     "action": {
         "default_popup": "popup.html"
-    }
+    },
+    "background": {
+        "service_worker": "background.js",
+        "type": "module"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_idle"
+        }
+    ]
 }
