@@ -11,19 +11,26 @@ class ToxicClassifier(nn.Module):
     def __init__(self, hidden_size=512):
         super().__init__()
         self.pho_bert = AutoModel.from_pretrained("vinai/phobert-base")
-        for param in self.pho_bert.parameters():
-            param.requires_grad = False
+        
+        for name, param in self.pho_bert.named_parameters():
+            if "encoder.layer.10" in name or "encoder.layer.11" in name or "pooler" in name:
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+        
         self.classifier = nn.Sequential(
+            nn.Dropout(0.3),
             nn.Linear(768, hidden_size),
             nn.ReLU(),
-            nn.Linear(hidden_size, 256),
-            nn.Dropout(0.3),
-            nn.Linear(256, 3)
+            nn.Dropout(0.2),
+            nn.Linear(hidden_size, 3)
         )
 
     def forward(self, inp, atn_msk):
         x = self.pho_bert(input_ids=inp, attention_mask=atn_msk)
-        return self.classifier(x.last_hidden_state[:, 0, :])
+        x = self.classifier(x.last_hidden_state[:, 0, :])
+        return x
+
 
 # --- Setup ---
 tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base")
